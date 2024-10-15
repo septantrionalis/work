@@ -1,35 +1,58 @@
 package work;
 
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class RuleValidator {
-
-    // Regular expression definitions based on the ABNF rules provided
-    private static final String tchar = "[!#$%&'*+\\-.^_`|~0-9A-Za-z]";
-    private static final String token = tchar + "+";
-    private static final String name = "[A-Za-z0-9]+"; // Assuming CHAR includes alphanumeric
-    private static final String headerReference = "header\\." + token;
-    private static final String queryReference = "query\\." + name;
-    private static final String pathReference = "path\\." + name;
-    private static final String bodyReference = "body(?:#(\\/(?:[^~\\/]|~[01])*)?)?";
-    private static final String jsonPointer = "(\\/[^~\\/]|~[01])*"; // simplified json-pointer
-    private static final String source = "(" + headerReference + "|" + queryReference + "|" + pathReference + "|" + bodyReference + ")";
     
-    private static final String expression = "\\$url|\\$method|\\$statusCode|\\$request\\." + source + "|\\$response\\." + source;
-
-    public static void main(String[] args) {
-        String testString = "$request.query.param"; // Example test string
-        if (isValidRule(testString)) {
-            System.out.println("Valid ABNF expression.");
-        } else {
-            System.out.println("Invalid ABNF expression.");
-        }
+    // Regular expressions based on the ABNF syntax provided
+    private static final String UNESCAPED = "[\\u0000-\\u002E\\u0030-\\u007D\\u007F-\\u10FFFF]";
+    private static final String ESCAPED = "~(0|1)";
+    private static final String REFERENCE_TOKEN = "(" + UNESCAPED + "|(" + ESCAPED + "))*";
+    private static final String JSON_POINTER = "((" + REFERENCE_TOKEN + ")?(/" + REFERENCE_TOKEN + ")*)?";
+    private static final String NAME = "[a-zA-Z0-9]+";
+    private static final String TOKEN = "[" + "!#$%&'*+\\-.^_`|~0-9A-Za-z]+";
+    
+    private static final String HEADER_REFERENCE = "header\\." + TOKEN;
+    private static final String QUERY_REFERENCE = "query\\." + NAME;
+    private static final String PATH_REFERENCE = "path\\." + NAME;
+    private static final String BODY_REFERENCE = "body(" + JSON_POINTER + ")?";
+    
+    private static final String SOURCE = "(" + HEADER_REFERENCE + "|" + QUERY_REFERENCE + "|" + PATH_REFERENCE + "|" + BODY_REFERENCE + ")";
+    
+    private static final String EXPRESSION = "(\\$url|\\$method|\\$statusCode|\\$request\\." + SOURCE + "|\\$response\\." + SOURCE + ")";
+    
+    // Pattern compiled for performance
+    private static final Pattern VALID_RULE_PATTERN = Pattern.compile("^" + EXPRESSION + "$");
+    
+    /**
+     * Validates if the given rule string is valid according to the defined syntax.
+     *
+     * @param rule the rule string to validate
+     * @return true if the rule is valid, false otherwise
+     */
+    public boolean isValidRule(String rule) {
+        return VALID_RULE_PATTERN.matcher(rule).matches();
     }
 
-    public static boolean isValidRule(String input) {
-        Pattern pattern = Pattern.compile("^(" + expression + ")$");
-        Matcher matcher = pattern.matcher(input);
-        return matcher.matches();
+    public static void main(String[] args) {
+        RuleValidator validator = new RuleValidator();
+
+        // Test cases including the new rule
+        String[] testRules = {
+            "$url",
+            "$method",
+            "$statusCode",
+            "$request.header.X-Custom-Header",
+            "$response.query.userId",
+            "$request.body#/data/item",
+            "$response.path.user.name",
+            "$response.header.content-type",
+            "$request.body#/callbackUrl", // New rule added for testing
+            "$invalidRule" // invalid rule for testing
+        };
+
+        for (String rule : testRules) {
+            System.out.println("Rule: " + rule + " is valid: " + validator.isValidRule(rule));
+        }
     }
 }
